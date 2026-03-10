@@ -1,0 +1,14 @@
+fastapi
+uvicorn[standard]
+sqlmodel        
+aiomysql        
+aioredis      
+aiokafka     
+alembic
+pymysql
+bcrypt
+cryptography
+python-dotenv
+pydantic
+pydantic-settings
+redis

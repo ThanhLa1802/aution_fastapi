@@ -1,0 +1,46 @@
+version: "3.9"
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: auction_mysql
+    restart: always
+    command: --local-infile=1
+    environment:
+      MYSQL_ROOT_PASSWORD: 123456
+      MYSQL_DATABASE: auction_db
+    ports:
+      - "3307:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+  
+  redis:
+    image: redis:7-alpine
+    container_name: auction_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379" 
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+  
+  api:
+    build: .
+    container_name: auction_api
+    volumes:
+      - .:/app
+    depends_on:
+      - mysql
+      - redis
+    env_file:
+      - .env
+    ports:
+      - "8000:8000"
+    command: >
+      sh -c "sleep 5 && 
+             alembic upgrade head &&
+             uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
+
+volumes:
+  mysql_data:
+  redis_data:
