@@ -6,9 +6,12 @@ aioredis
 aiokafka     
 alembic
 pymysql
-bcrypt
 cryptography
 python-dotenv
 pydantic
 pydantic-settings
 redis
+python-jose
+pydantic[email]
+passlib==1.7.4
+bcrypt==3.2.2
