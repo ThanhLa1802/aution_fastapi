@@ -19,8 +19,13 @@ class UserBase(BaseModel):
 class UserCreate(UserBase):
     password: str
 
+class TokenResponse(BaseModel):
+    access_token: str
+    token_type: str
+
 class UserResponse(UserBase):
     id: int
     is_active: bool
+    email: EmailStr
 
     model_config = ConfigDict(from_attributes=True)

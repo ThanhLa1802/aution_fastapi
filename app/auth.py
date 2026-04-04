@@ -12,10 +12,20 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 def verify_token(token: str):
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        user_id: int = payload.get("sub")
-        if user_id is None:
+        email: str = payload.get("sub")
+        id = payload.get("id")
+        if email is None:
             return None
-        return {"id": user_id}
+        return {"email": email, "id": id}
+    except JWTError:
+        return None
+
+def get_email_from_token(token: str):
+    """Extract user email from JWT token"""
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        email: str = payload.get("sub")
+        return email
     except JWTError:
         return None
 

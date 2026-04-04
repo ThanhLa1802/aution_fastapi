@@ -5,12 +5,12 @@ from .routers.users import router as user_router
 from .models import Base
 from .database import engine
 from fastapi.middleware.cors import CORSMiddleware
+from .middlewares.log_middleware import MyAdvancedMiddleware
 
 origins = [
     "http://localhost:8000",
     "http://127.0.0.1:8000",
 ]
-
 
 
 async def init_db():
@@ -21,11 +21,13 @@ app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,   # hoặc ["*"] để test
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
-    allow_headers=["*"],
+    allow_headers=["*"]
 )
+app.add_middleware(MyAdvancedMiddleware)
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     async with engine.begin() as conn:

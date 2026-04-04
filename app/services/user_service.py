@@ -26,5 +26,8 @@ class UserService:
         if not user or not verify_password(user_in.password, user.hashed_password):
             raise HTTPException(status_code=401, detail="Invalid credentials")
         
-        token = create_access_token(data={"sub": user.email})
+        token = create_access_token(data={"sub": user.email, "id": user.id})
         return {"access_token": token, "token_type": "bearer"}
+    
+    async def get_user_by_email(self, email: str):
+        return await self.user_repo.get_user_by_email(email)
