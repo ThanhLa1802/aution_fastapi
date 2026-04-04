@@ -1,0 +1,26 @@
+import random
+from fastapi import HTTPException, BackgroundTasks
+from redis import Redis
+
+class AuthService:
+    def __init__(self, redis: Redis):
+        self.redis = redis
+
+    async def process_2fa_login(self, email: str, background_tasks: BackgroundTasks):
+        limit_key = f"rate_limit:{email}"
+        if self.redis.exists(limit_key):
+            raise HTTPException(status_code=429, detail="Too many attempts. Please try again later.")
+
+        otp_code = f"{random.randint(100000, 999999)}"
+
+        self.redis.setex(f"otp:{email}", 60, otp_code)
+        
+        self.redis.setex(limit_key, 60, "locked")
+
+        background_tasks.add_task(self.send_otp_email, email, otp_code)
+        print(f"[DEBUG] Generated OTP for {email}: {otp_code}")  # Debug log
+        return {"status": "2fa_required", "message": "OTP has been sent to your email"}
+
+    def send_otp_email(self, email: str, otp: str):
+        print(f"\n[EMAIL SERVICE] Send to: {email}")
+        print(f"--- Your OTP: {otp} (Expires in 60s) ---\n")

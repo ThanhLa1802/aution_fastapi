@@ -12,15 +12,15 @@ services:
     volumes:
       - mysql_data:/var/lib/mysql
   
-  # redis:
-  #   image: redis:7-alpine
-  #   container_name: auction_redis
-  #   restart: unless-stopped
-  #   ports:
-  #     - "6379:6379" 
-  #   volumes:
-  #     - redis_data:/data
-  #   command: redis-server --appendonly yes
+  redis:
+    image: redis:7-alpine
+    container_name: auction_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379" 
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
   
   api:
     build: .
@@ -29,7 +29,7 @@ services:
       - .:/app
     depends_on:
       - mysql
-      # - redis
+      - redis
     env_file:
       - .env
     ports:
@@ -41,4 +41,4 @@ services:
 
 volumes:
   mysql_data:
-  # redis_data:
+  redis_data:

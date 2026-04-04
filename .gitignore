@@ -1,3 +1,5 @@
 /scripts
 *.pyc
 .env
+*.pyc
+__pycache__/
