@@ -58,6 +58,7 @@ class TwoFAService:
         Returns True if valid, raises HTTPException if invalid
         """
         totp = pyotp.TOTP(secret)
+        print(totp.now())  # Debug: print current TOTP code
         
         # Verify the code (allow ±1 time window for clock skew)
         if not totp.verify(code, valid_window=1):
@@ -114,7 +115,7 @@ class TwoFAService:
             raise HTTPException(status_code=404, detail="2FA not enabled")
         
         totp = pyotp.TOTP(user.totp_secret)
-        
+        print(totp.now())  # Debug: print current TOTP code
         if not totp.verify(code, valid_window=1):
             raise HTTPException(
                 status_code=400,
