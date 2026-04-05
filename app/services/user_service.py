@@ -9,12 +9,10 @@ class UserService:
         self.user_repo = user_repo
 
     async def register_user(self, user_in: UserCreate):
-        # Kiểm tra nghiệp vụ
         existing_user = await self.user_repo.get_user_by_email(user_in.email)
         if existing_user:
             raise HTTPException(status_code=400, detail="Email already registered")
         
-        # Chuyển đổi Schema -> Model và xử lý dữ liệu
         new_user = User(
             email=user_in.email,
             hashed_password=hash_password(user_in.password)
@@ -25,7 +23,8 @@ class UserService:
         user = await self.user_repo.get_user_by_email(user_in.email)
         if not user or not verify_password(user_in.password, user.hashed_password):
             raise HTTPException(status_code=401, detail="Invalid credentials")
-        
+        if user.is_enabled_2fa:
+            raise HTTPException(status_code=403, detail="2FA enabled, please login via /auth/send-otp")
         token = create_access_token(data={"sub": user.email, "id": user.id})
         return {"access_token": token, "token_type": "bearer"}
     

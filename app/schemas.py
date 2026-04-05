@@ -29,3 +29,15 @@ class UserResponse(UserBase):
     email: EmailStr
 
     model_config = ConfigDict(from_attributes=True)
+
+class TwoFASetupResponse(BaseModel):
+    secret: str
+    qr_code: str  # base64 encoded QR code
+    manual_entry_key: str
+
+class TwoFAVerifyRequest(BaseModel):
+    code: str  # 6-digit TOTP code
+
+class TwoFAEnableResponse(BaseModel):
+    message: str
+    is_enabled_2fa: bool

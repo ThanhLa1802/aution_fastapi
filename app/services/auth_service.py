@@ -1,6 +1,11 @@
 import random
+from jose import jwt
+from datetime import datetime, timezone
 from fastapi import HTTPException, BackgroundTasks
 from redis import Redis
+
+SECRET_KEY = "your_secret_key"
+ALGORITHM = "HS256"
 
 class AuthService:
     def __init__(self, redis: Redis):
@@ -24,3 +29,19 @@ class AuthService:
     def send_otp_email(self, email: str, otp: str):
         print(f"\n[EMAIL SERVICE] Send to: {email}")
         print(f"--- Your OTP: {otp} (Expires in 60s) ---\n")
+    
+    async def logout(self, token: str):
+        # 1. Decode token
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        expire_timestamp = payload.get("exp")
+        
+        # 2. Calculate TTL for blacklist entry
+        now = datetime.now(timezone.utc).timestamp()
+        ttl = int(expire_timestamp - now)
+        
+        if ttl > 0:
+            # 3. Save to Redis Blacklist with token identifier
+            # Key: blacklist:{token}, Value: 1, TTL: remaining time
+            self.redis.setex(f"blacklist:{token}", ttl, "1")
+        
+        return {"message": "Logged out successfully"}

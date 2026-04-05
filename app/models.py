@@ -11,6 +11,8 @@ class User(Base):
     email: Mapped[str] = mapped_column(String(255), unique=True, index=True)
     hashed_password: Mapped[str] = mapped_column(String(255))
     is_active: Mapped[bool] = mapped_column(default=True)
+    is_enabled_2fa: Mapped[bool] = mapped_column(default=False)
+    totp_secret: Mapped[str] = mapped_column(String(255), nullable=True)
 
     # Quan hệ với bảng Task
     tasks = relationship("Task", back_populates="owner", cascade="all, delete-orphan")

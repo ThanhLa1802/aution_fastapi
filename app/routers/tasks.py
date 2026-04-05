@@ -19,11 +19,11 @@ async def create_task(
     service: TaskService = Depends(get_task_service),
     current_user = Depends(get_current_user)
 ):
-    return await service.create_new_task(task_in, current_user.get("id"))
+    return await service.create_new_task(task_in, current_user.id)
 
 @router.get("/", response_model=List[TaskResponse])
 async def list_tasks(
     service: TaskService = Depends(get_task_service),
     current_user = Depends(get_current_user)
 ):
-    return await service.get_user_tasks(current_user.get("id"))
+    return await service.get_user_tasks(current_user.id)
