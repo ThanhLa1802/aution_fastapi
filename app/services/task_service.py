@@ -24,3 +24,26 @@ class TaskService:
             
         await self.task_repo.delete(task)
         return {"message": "Delete successfully"}
+    
+    async def update_user_task(self, task_id: int, task_in: TaskCreate, user_id: int):
+        task = await self.task_repo.get_by_id(task_id)
+        if not task:
+            raise HTTPException(status_code=404, detail="Task not found")
+        
+        if task.owner_id != user_id:
+            raise HTTPException(status_code=403, detail="You do not have permission to update this task")
+        
+        task.title = task_in.title
+        task.description = task_in.description
+        return await self.task_repo.update(task)
+    
+    async def mark_task_completed(self, task_id: int, user_id: int):
+        task = await self.task_repo.get_by_id(task_id)
+        if not task:
+            raise HTTPException(status_code=404, detail="Task not found")
+        
+        if task.owner_id != user_id:
+            raise HTTPException(status_code=403, detail="You do not have permission to update this task")
+        
+        task.is_completed = True
+        return await self.task_repo.update(task)

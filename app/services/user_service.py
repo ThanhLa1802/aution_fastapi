@@ -22,11 +22,20 @@ class UserService:
     async def authenticate_user(self, user_in: UserCreate):
         user = await self.user_repo.get_user_by_email(user_in.email)
         if not user or not verify_password(user_in.password, user.hashed_password):
-            raise HTTPException(status_code=401, detail="Invalid credentials")
+            raise HTTPException(status_code=401, detail="Password or email is incorrect")
+        
+        # If 2FA is enabled, require TOTP verification
         if user.is_enabled_2fa:
-            raise HTTPException(status_code=403, detail="2FA enabled, please login via /auth/send-totp")
+            # Return response indicating 2FA is required
+            return {
+                "message": "2FA verification required",
+                "requires_2fa": True,
+                "email": user.email
+            }
+        
+        # No 2FA, issue regular access token
         token = create_access_token(data={"sub": user.email, "id": user.id})
-        return {"access_token": token, "token_type": "bearer"}
+        return {"access_token": token, "token_type": "bearer", "requires_2fa": False}
     
     async def get_user_by_email(self, email: str):
         return await self.user_repo.get_user_by_email(email)

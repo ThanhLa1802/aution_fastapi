@@ -7,6 +7,7 @@ from app.services.auth_service import AuthService
 from app.services.twofa_service import TwoFAService
 from app.repositories.user_repo import UserRepository
 from app.database import get_db
+from app.schemas import TOTPLoginRequest
 from ..core.redis import get_redis
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
@@ -58,6 +59,28 @@ async def verify_totp(
     
     # Issue access token
     token = create_access_token(data={"sub": request.email})
+    return {"access_token": token, "token_type": "bearer"}
+
+
+@router.post("/verify-totp-login")
+async def verify_totp_login(
+    email: str,
+    request: TOTPLoginRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Verify TOTP code during login for users with 2FA enabled.
+    Call this after user provides email, password, and TOTP code.
+    The email must match the user's registered email.
+    """
+    user_repo = UserRepository(db)
+    twofa_service = TwoFAService(user_repo)
+    
+    # Verify the TOTP code
+    await twofa_service.verify_totp_code(email, request.code)
+    
+    # Issue access token after successful 2FA verification
+    token = create_access_token(data={"sub": email})
     return {"access_token": token, "token_type": "bearer"}
 
 

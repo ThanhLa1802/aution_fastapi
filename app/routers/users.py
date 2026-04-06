@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 from ..database import get_db
-from ..schemas import TokenResponse, UserCreate, UserResponse
+from ..schemas import TokenResponse, UserCreate, UserResponse, LoginResponse
 from ..services.user_service import UserService
 from ..repositories.user_repo import UserRepository
 from ..dependencies import get_email_from_current_token
@@ -16,7 +16,7 @@ async def get_user_service(db: AsyncSession = Depends(get_db)) -> UserService:
 async def register(user_in: UserCreate, service: UserService = Depends(get_user_service)):
     return await service.register_user(user_in)
 
-@router.post("/login", response_model=TokenResponse)
+@router.post("/login", response_model=LoginResponse)
 async def login(user_in: UserCreate, service: UserService = Depends(get_user_service)):
     return await service.authenticate_user(user_in)
 

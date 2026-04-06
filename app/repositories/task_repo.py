@@ -23,3 +23,9 @@ class TaskRepository:
     async def delete(self, task: Task):
         await self.db.delete(task)
         await self.db.commit()
+
+    async def update(self, task: Task):
+        self.db.add(task)
+        await self.db.commit()
+        await self.db.refresh(task)
+        return task

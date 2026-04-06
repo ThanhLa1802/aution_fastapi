@@ -12,6 +12,10 @@ from .middlewares.log_middleware import MyAdvancedMiddleware
 origins = [
     "http://localhost:8000",
     "http://127.0.0.1:8000",
+    "http://localhost:5500",      # VS Code Live Server
+    "http://127.0.0.1:5500",      # VS Code Live Server
+    "http://localhost:8080",      # Python http.server
+    "http://127.0.0.1:8080",      # Python http.server
 ]
 
 
