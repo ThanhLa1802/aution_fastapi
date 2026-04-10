@@ -2,8 +2,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import func
 from sqlmodel import select
 from typing import Optional, List
+import logging
 
 from models import Product, Category
+from services.indexing_service import indexing_service
+
+logger = logging.getLogger(__name__)
 
 
 class ProductRepo:
@@ -16,7 +20,7 @@ class ProductRepo:
         min_price: Optional[float],
         max_price: Optional[float],
         in_stock: bool,
-        search: Optional[str],
+        search: Optional[str] = None,
     ):
         query = select(Product).where(Product.status == 1)
         if category_id is not None:
@@ -27,9 +31,46 @@ class ProductRepo:
             query = query.where(Product.price <= max_price)
         if in_stock:
             query = query.where(Product.stock > 0)
+        # Note: search is now handled in get_list via Elasticsearch
         if search:
+            # Fallback to ILIKE if Elasticsearch is not available
             query = query.where(Product.name.ilike(f'%{search}%'))
         return query
+
+    async def _search_elasticsearch(
+        self,
+        search: str,
+        category_id: Optional[int] = None,
+        min_price: Optional[float] = None,
+        max_price: Optional[float] = None,
+        in_stock: bool = False,
+        limit: int = 20,
+        offset: int = 0,
+    ) -> tuple:
+        """
+        Search using Elasticsearch with fallback to PostgreSQL.
+        
+        Returns:
+            tuple: (product_ids, total_count) or (None, None) if fallback needed
+        """
+        total, es_results = await indexing_service.search_products(
+            query=search,
+            category_id=category_id,
+            min_price=min_price,
+            max_price=max_price,
+            in_stock=in_stock,
+            limit=limit,
+            offset=offset
+        )
+        
+        # If ES failed (returns None), we'll use database fallback
+        if total is None:
+            logger.warning("Elasticsearch search failed, falling back to PostgreSQL")
+            return None, None
+        
+        # Extract IDs from ES results
+        product_ids = [int(result.get('id')) for result in es_results]
+        return product_ids, total
 
     async def get_count(
         self,
@@ -39,6 +80,25 @@ class ProductRepo:
         in_stock: bool = False,
         search: Optional[str] = None,
     ) -> int:
+        # If search is provided, try Elasticsearch first
+        if search:
+            product_ids, total = await self._search_elasticsearch(
+                search=search,
+                category_id=category_id,
+                min_price=min_price,
+                max_price=max_price,
+                in_stock=in_stock,
+                limit=1,  # We only need count, so fetch minimal data
+                offset=0
+            )
+            
+            # If ES succeeded, return the total
+            if total is not None:
+                return total
+            
+            # If ES failed, fall back to database (continue below)
+        
+        # Database fallback or non-search query
         query = select(func.count()).select_from(
             self._base_query(category_id, min_price, max_price, in_stock, search).subquery()
         )
@@ -55,6 +115,31 @@ class ProductRepo:
         offset: int = 0,
         search: Optional[str] = None,
     ) -> List[Product]:
+        # If search is provided, try Elasticsearch first
+        if search:
+            product_ids, total = await self._search_elasticsearch(
+                search=search,
+                category_id=category_id,
+                min_price=min_price,
+                max_price=max_price,
+                in_stock=in_stock,
+                limit=limit,
+                offset=offset
+            )
+            
+            # If ES succeeded and returned results, fetch products from DB
+            if total is not None:
+                if product_ids:
+                    result = await self.db.execute(
+                        select(Product).where(Product.id.in_(product_ids)).where(Product.status == 1)
+                    )
+                    return result.scalars().all()
+                else:
+                    return []  # No results from ES
+            
+            # If ES failed, fall back to database (continue below)
+        
+        # Database fallback or non-search query
         query = self._base_query(category_id, min_price, max_price, in_stock, search)
         query = query.offset(offset).limit(limit)
         result = await self.db.execute(query)

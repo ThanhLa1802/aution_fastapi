@@ -2,10 +2,14 @@ from typing import Optional, List
 from fastapi import HTTPException
 from redis.asyncio import Redis
 import json
+import logging
 
 from repos.product_repo import ProductRepo
 from models import Product, Category
 from schemas.product import ProductCreate, ProductUpdate, CategoryCreate
+from services.indexing_service import indexing_service
+
+logger = logging.getLogger(__name__)
 
 
 class ProductService:
@@ -63,7 +67,13 @@ class ProductService:
             if not cat:
                 raise HTTPException(status_code=404, detail='Category not found')
         product = Product(**body.model_dump())
-        return await self.repo.save(product)
+        saved = await self.repo.save(product)
+        
+        # Index the product in Elasticsearch
+        product_dict = saved.model_dump()
+        await indexing_service.index_product(product_dict)
+        
+        return saved
 
     async def update_product(self, product_id: int, body: ProductUpdate) -> Product:
         product = await self.repo.get_by_id_any(product_id)
@@ -72,6 +82,11 @@ class ProductService:
         for field, value in body.model_dump(exclude_none=True).items():
             setattr(product, field, value)
         saved = await self.repo.save(product)
+        
+        # Reindex the product in Elasticsearch
+        product_dict = saved.model_dump()
+        await indexing_service.index_product(product_dict)
+        
         await self.redis.delete(f'product:{product_id}')
         return saved
 
@@ -81,6 +96,10 @@ class ProductService:
             raise HTTPException(status_code=404, detail='Product not found')
         product.status = 0
         await self.repo.save(product)
+        
+        # Delete from Elasticsearch
+        await indexing_service.delete_product(product_id)
+        
         await self.redis.delete(f'product:{product_id}')
 
     async def create_category(self, body: CategoryCreate) -> Category:

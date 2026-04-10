@@ -1,10 +1,13 @@
 import { fastapiClient } from './client';
 
 export const getProducts = (params) =>
-  fastapiClient.get('/products', { params }).then((r) => r.data);
+    fastapiClient.get('/products', { params }).then((r) => r.data);
 
 export const getProduct = (id) =>
-  fastapiClient.get(`/products/${id}`).then((r) => r.data);
+    fastapiClient.get(`/products/${id}`).then((r) => r.data);
 
 export const getCategories = () =>
-  fastapiClient.get('/products/categories').then((r) => r.data);
+    fastapiClient.get('/products/categories').then((r) => r.data);
+
+export const autocompleteProducts = (query, limit = 10) =>
+    fastapiClient.get('/products/autocomplete', { params: { q: query, limit } }).then((r) => r.data);

@@ -3,6 +3,8 @@ uvicorn[standard]
 sqlmodel
 asyncpg
 redis[asyncio]
+elasticsearch[asyncio]==8.11.0
+aiohttp
 python-dotenv
 pydantic
 pydantic-settings

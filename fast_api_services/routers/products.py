@@ -1,13 +1,16 @@
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from redis.asyncio import Redis
+from sqlmodel import select
+from decimal import Decimal
 from typing import Optional
 
 from dependencies import get_db, get_redis, get_current_admin
 from repos.product_repo import ProductRepo
 from services.product_service import ProductService
+from services.indexing_service import indexing_service
 from schemas.product import ProductCreate, ProductUpdate, ProductResponse, CategoryCreate, CategoryResponse
-from models import User
+from models import User, Product
 
 router = APIRouter(tags=['products'])
 
@@ -28,6 +31,22 @@ async def list_products(
     svc: ProductService = Depends(_svc),
 ):
     return await svc.list_products(category_id, min_price, max_price, in_stock, limit, offset, search)
+
+
+@router.get('/products/autocomplete')
+async def autocomplete_products(
+    q: Optional[str] = Query(None, min_length=1),
+    limit: int = Query(10, ge=1, le=50),
+):
+    """
+    Autocomplete endpoint for product search suggestions.
+    Returns product suggestions based on partial query.
+    """
+    if not q:
+        return {'suggestions': []}
+    
+    suggestions = await indexing_service.autocomplete(q, limit=limit)
+    return {'suggestions': suggestions}
 
 
 @router.get('/products/categories')
@@ -79,3 +98,36 @@ async def admin_create_category(
 ):
     category = await svc.create_category(body)
     return category.model_dump()
+
+
+@router.post('/admin/products/reindex', status_code=200)
+async def admin_reindex_products(
+    rebuild: bool = Query(False, description='Delete and recreate the index before reindexing'),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_admin),
+):
+    """
+    Manually trigger a full reindex of all products into Elasticsearch.
+    Use rebuild=true to delete and recreate the index first.
+    """
+    from database import elasticsearch_client, PRODUCT_INDEX, init_elasticsearch
+
+    if rebuild:
+        try:
+            await elasticsearch_client.indices.delete(index=PRODUCT_INDEX)
+        except Exception:
+            pass
+        await init_elasticsearch()
+
+    result = await db.execute(select(Product).where(Product.status == 1))
+    products_list = result.scalars().all()
+
+    product_dicts = []
+    for p in products_list:
+        d = p.model_dump()
+        if isinstance(d.get('price'), Decimal):
+            d['price'] = float(d['price'])
+        product_dicts.append(d)
+
+    success, errors = await indexing_service.bulk_index_products(product_dicts)
+    return {'indexed': success, 'errors': errors, 'total': len(product_dicts)}

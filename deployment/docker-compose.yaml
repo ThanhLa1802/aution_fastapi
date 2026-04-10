@@ -20,6 +20,22 @@ services:
     ports:
       - "6379:6379"
 
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.11.0
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    ports:
+      - "9200:9200"
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+    healthcheck:
+      test: curl -s http://localhost:9200 >/dev/null || exit 1
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
   django:
     build:
       context: ../core_service
@@ -55,6 +71,7 @@ services:
     environment:
       DATABASE_URL: postgresql+asyncpg://${DB_USER:-postgres}:${DB_PASSWORD:-postgres}@db:5432/${DB_NAME:-ecommerce}
       REDIS_URL: redis://redis:6379
+      ELASTICSEARCH_URL: http://elasticsearch:9200
       SECRET_KEY: ${SECRET_KEY:-django-insecure-dev-only-CHANGEME}
       # Django ORM bootstrap
       DJANGO_PROJECT_PATH: /django_app
@@ -68,6 +85,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_started
+      elasticsearch:
+        condition: service_healthy
 
   frontend:
     build:
@@ -81,3 +100,4 @@ services:
 
 volumes:
   postgres_data:
+  elasticsearch_data:
