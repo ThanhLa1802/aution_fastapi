@@ -1,0 +1,17 @@
+fastapi
+uvicorn[standard]
+sqlmodel
+asyncpg
+redis[asyncio]
+python-dotenv
+pydantic
+pydantic-settings
+pydantic[email]
+python-jose[cryptography]
+passlib[bcrypt]
+# Django ORM (for sync_to_async transactional writes)
+django>=4.2
+psycopg2-binary
+Pillow
+djangorestframework
+djangorestframework-simplejwt

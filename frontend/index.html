@@ -1,119 +1,18 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Task Manager - Login</title>
-    <link rel="stylesheet" href="styles.css">
-</head>
-
-<body>
-    <div class="container">
-        <div class="auth-card">
-            <div class="auth-header">
-                <h1>Task Manager</h1>
-                <p>Organize and manage your tasks efficiently</p>
-            </div>
-
-            <!-- Login Form -->
-            <div id="login-form" class="auth-form active">
-                <h2>Login</h2>
-                <form id="loginForm">
-                    <div class="form-group">
-                        <label for="login-email">Email Address</label>
-                        <input type="email" id="login-email" name="email" placeholder="Enter your email" required>
-                        <span class="error-message" id="login-email-error"></span>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="login-password">Password</label>
-                        <input type="password" id="login-password" name="password" placeholder="Enter your password"
-                            required>
-                        <span class="error-message" id="login-password-error"></span>
-                    </div>
-
-                    <button type="submit" class="btn btn-primary">Login</button>
-                    <span class="error-message" id="login-general-error"></span>
-                </form>
-
-                <div class="auth-footer">
-                    <p>Don't have an account? <a href="#" onclick="switchForm('register')">Register here</a></p>
-                </div>
-            </div>
-
-            <!-- Register Form -->
-            <div id="register-form" class="auth-form">
-                <h2>Create Account</h2>
-                <form id="registerForm">
-                    <div class="form-group">
-                        <label for="register-email">Email Address</label>
-                        <input type="email" id="register-email" name="email" placeholder="Enter your email" required>
-                        <span class="error-message" id="register-email-error"></span>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="register-password">Password</label>
-                        <input type="password" id="register-password" name="password"
-                            placeholder="Create a strong password" required>
-                        <span class="error-message" id="register-password-error"></span>
-                        <div class="password-requirements">
-                            <p>Password must contain:</p>
-                            <ul>
-                                <li id="req-length">At least 8 characters</li>
-                                <li id="req-uppercase">At least one uppercase letter</li>
-                                <li id="req-lowercase">At least one lowercase letter</li>
-                                <li id="req-number">At least one number</li>
-                            </ul>
-                        </div>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="register-password-confirm">Confirm Password</label>
-                        <input type="password" id="register-password-confirm" name="password_confirm"
-                            placeholder="Confirm your password" required>
-                        <span class="error-message" id="register-password-confirm-error"></span>
-                    </div>
-
-                    <button type="submit" class="btn btn-primary">Create Account</button>
-                    <span class="error-message" id="register-general-error"></span>
-                </form>
-
-                <div class="auth-footer">
-                    <p>Already have an account? <a href="#" onclick="switchForm('login')">Login here</a></p>
-                </div>
-            </div>
-
-            <!-- Success Message -->
-            <div id="success-message" class="success-message" style="display: none;">
-                <div class="success-content">
-                    <h3>✓ Success!</h3>
-                    <p id="success-text"></p>
-                </div>
-            </div>
-
-            <!-- 2FA TOTP Verification Form -->
-            <div id="totp-form" class="auth-form">
-                <h2>Two-Factor Authentication</h2>
-                <p style="text-align: center; color: #666; margin: 10px 0 20px 0;">Enter your 6-digit authentication code</p>
-                <form id="totpForm">
-                    <div class="form-group">
-                        <label for="totp-code">Authentication Code</label>
-                        <input type="text" id="totp-code" name="code" placeholder="000000" maxlength="6" inputmode="numeric" required>
-                        <span class="error-message" id="totp-error"></span>
-                    </div>
-
-                    <button type="submit" class="btn btn-primary">Verify</button>
-                </form>
-
-                <div class="auth-footer">
-                    <p><a href="#" onclick="switchForm('login')">Back to login</a></p>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <script src="auth.js"></script>
-</body>
-
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ShopFast</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
 </html>
