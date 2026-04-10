@@ -6,8 +6,9 @@ from decimal import Decimal
 import logging
 
 from routers import products, cart, wishlist, reviews, orders
-from database import init_elasticsearch, elasticsearch_client, health_check_elasticsearch, PRODUCT_INDEX
+from database import init_elasticsearch, elasticsearch_client, health_check_elasticsearch, PRODUCT_INDEX, AsyncSessionLocal
 from services.indexing_service import indexing_service
+from middleware.rate_limit import RateLimitMiddleware
 
 logger = logging.getLogger(__name__)
 
@@ -25,6 +26,7 @@ app.add_middleware(
     allow_methods=['*'],
     allow_headers=['*'],
 )
+app.add_middleware(RateLimitMiddleware)
 
 PREFIX = '/api/v1'
 app.include_router(products.router, prefix=PREFIX)
@@ -57,6 +59,26 @@ async def startup_event():
             logger.info(f'Elasticsearch index already has {doc_count} documents, skipping auto-sync')
     except Exception as e:
         logger.error(f'Failed to initialize Elasticsearch: {e}')
+
+    # Warm Redis stock cache + register per-user rate limiting
+    logger.info('Warming Redis stock cache...')
+    try:
+        from sqlmodel import select
+        from models import Product
+        from dependencies import get_redis
+        from services.stock_cache import warm_all_products
+
+        redis = await get_redis()
+        app.state.redis = redis  # expose to RateLimitMiddleware
+        async with AsyncSessionLocal() as db:
+            result = await db.execute(
+                select(Product.id, Product.stock).where(Product.status == 1)
+            )
+            products = [{'id': row[0], 'stock': row[1]} for row in result.all()]
+        await warm_all_products(redis, products)
+        logger.info('Rate limiting middleware registered')
+    except Exception as e:
+        logger.error(f'Failed to warm Redis stock cache: {e}')
 
 
 async def _sync_all_products():

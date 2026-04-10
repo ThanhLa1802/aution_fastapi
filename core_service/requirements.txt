@@ -4,3 +4,4 @@ python-dotenv
 Pillow
 djangorestframework
 djangorestframework-simplejwt
+django-axes

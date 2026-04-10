@@ -9,8 +9,9 @@ from redis.asyncio import Redis
 from dependencies import get_db, get_current_user, get_current_admin, get_redis
 from repos.order_repo import OrderRepo
 from services.order_service import OrderService
+from services.stock_cache import reserve_stock, release_stock, restore_stock, warm_all_products
 from schemas.order import CheckoutRequest, OrderResponse, OrderAdminResponse, OrderStatusUpdate
-from models import User
+from models import User, Product
 
 # Django services — called via sync_to_async so they run in a thread pool,
 # where transaction.atomic() + select_for_update() work correctly.
@@ -34,25 +35,51 @@ async def checkout(
     svc: OrderService = Depends(_svc),
     current_user: User = Depends(get_current_user),
     redis: Redis = Depends(get_redis),
+    db: AsyncSession = Depends(get_db),
 ):
     """
-    Checkout flow:
-    1. Django's create_order_safe runs atomically in a thread pool
-       (optimistic locking via Product.version prevents oversell).
-    2. Returns the Django Order.pk once committed.
-    3. FastAPI re-reads the order via async SQLAlchemy to build the response.
-    4. Redis caches for ordered products are invalidated immediately.
+    Checkout with Redis stock gate to prevent DB hotspot rows.
+
+    Flow:
+    1. Read cart items (no lock) to know product_id + quantity pairs.
+    2. Atomic Lua script in Redis pre-filters:
+       - result  0 → out of stock → 429, no DB hit
+       - result  1 → reserved → proceed to Django
+       - result -1 → cache miss → fall through to Django without reservation
+    3. Django create_order_safe (optimistic locking, up to 3 retries).
+    4. On DB failure → release Redis reservation.
+    5. Invalidate stale product caches.
     """
+    # Step 1: read cart to build reservation list (no locks needed here)
+    repo = OrderRepo(db)
+    _, cart_items = await repo.get_cart_items(current_user.id)
+    if not cart_items:
+        raise HTTPException(status_code=400, detail='Cart is empty')
+
+    items = [(item.product_id, item.quantity) for item in cart_items]
+
+    # Step 2: Redis stock gate — atomic Lua, single round-trip
+    reservation = await reserve_stock(redis, items)
+    if reservation == 0:
+        raise HTTPException(
+            status_code=429,
+            detail='Sorry, this item is sold out. Please try again later.'
+        )
+    reserved = reservation == 1  # False when cache miss → no rollback needed
+
+    # Step 3: Django atomic checkout (optimistic locking + retry)
     try:
         django_order = await sync_to_async(create_order_safe)(
             current_user.id, body.shipping_address_id
         )
     except ValueError as exc:
+        if reserved:
+            await release_stock(redis, items)  # rollback Redis on DB failure
         raise HTTPException(status_code=400, detail=str(exc))
 
     order = await svc.get_order(current_user.id, django_order.pk)
 
-    # Invalidate stale product caches so stock counts update immediately
+    # Step 5: Invalidate stale product caches so stock counts update immediately
     product_ids = [item.product_id for item in order.items]
     if product_ids:
         keys = [f'product:{pid}' for pid in product_ids]
@@ -88,17 +115,26 @@ async def cancel_order(
     order_id: UUID,
     svc: OrderService = Depends(_svc),
     current_user: User = Depends(get_current_user),
+    redis: Redis = Depends(get_redis),
 ):
     """
-    Atomically cancel an order and restore product stock via Django ORM.
-    FastAPI re-reads the updated order to build the response.
+    Cancel order, restore PostgreSQL stock via Django ORM, and restore Redis
+    stock so freed units are immediately available for the next buyer.
     """
+    # Read items before cancel so we know what to restore in Redis
+    order_before = await svc.get_order(current_user.id, order_id)
+    items = [(item.product_id, item.quantity) for item in order_before.items]
+
     try:
         django_order = await sync_to_async(cancel_order_safe)(current_user.id, order_id)
     except ValueError as exc:
         detail = str(exc)
         status_code = 404 if 'not found' in detail.lower() else 400
         raise HTTPException(status_code=status_code, detail=detail)
+
+    # Restore Redis stock so freed units are immediately purchasable
+    await restore_stock(redis, items)
+
     return await svc.get_order(current_user.id, django_order.pk)
 
 
@@ -124,3 +160,21 @@ async def admin_update_order_status(
     _: User = Depends(get_current_admin),
 ):
     return await svc.admin_update_status(order_id, body, lambda uid: _get_user_by_id(uid, db))
+
+
+@router.post('/admin/stock/warm', status_code=200)
+async def warm_stock_cache(
+    redis: Redis = Depends(get_redis),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_admin),
+):
+    """
+    Pre-load all active product stock into Redis.
+    Run this before a flash sale to activate the Redis stock gate.
+    """
+    result = await db.execute(
+        select(Product.id, Product.stock).where(Product.status == 1)
+    )
+    products = [{'id': row[0], 'stock': row[1]} for row in result.all()]
+    count = await warm_all_products(redis, products)
+    return {'warmed': count, 'message': f'Stock cache warmed for {count} products'}
