@@ -4,25 +4,49 @@ from django.db.models import F
 from .models import Order, OrderItem, Product, Cart, CartItem, Payment, Address
 
 
+class _RetryNeeded(Exception):
+    """Raised internally when an optimistic lock conflict is detected."""
+
+
 def create_order_safe(user_id: int, shipping_address_id: int = None):
     """
-    Atomically converts a user's cart into an Order.
-    Locks each product row, validates stock, creates Order + OrderItems,
-    records a mock Payment, and clears the cart.
+    Atomically converts a user's cart into an Order using optimistic locking.
+
+    Instead of holding row-level locks (select_for_update), each product stock
+    update is conditional on Product.version not having changed since we read it:
+
+        UPDATE orders_product
+        SET stock = stock - qty, version = version + 1
+        WHERE id = ? AND version = <snapshot> AND stock >= qty
+
+    If 0 rows are updated a concurrent transaction modified the product;
+    the whole atomic block is rolled back and we retry up to 3 times.
     Returns the created Order or raises ValueError.
     """
+    max_retries = 3
+    for attempt in range(max_retries):
+        try:
+            return _attempt_create_order(user_id, shipping_address_id)
+        except _RetryNeeded:
+            if attempt == max_retries - 1:
+                raise ValueError(
+                    "Could not complete checkout due to concurrent stock updates. "
+                    "Please try again."
+                )
+
+
+def _attempt_create_order(user_id: int, shipping_address_id):
     with transaction.atomic():
         try:
             cart = (
                 Cart.objects
                 .prefetch_related('items__product')
-                .select_for_update()
                 .get(user_id=user_id)
             )
         except Cart.DoesNotExist:
             raise ValueError("Cart is empty")
 
-        items = list(cart.items.all())
+        items = list(cart.items.select_related('product').all())
         if not items:
             raise ValueError("Cart is empty")
 
@@ -37,19 +61,31 @@ def create_order_safe(user_id: int, shipping_address_id: int = None):
         order_items = []
 
         for cart_item in items:
-            product = Product.objects.select_for_update().get(id=cart_item.product_id)
+            product = cart_item.product
 
+            # Fast pre-check with the snapshot value (avoids an extra DB round-trip
+            # on the happy path when stock is clearly insufficient)
             if product.stock < cart_item.quantity:
                 raise ValueError(f"Not enough stock for '{product.name}'")
 
-            product.stock -= cart_item.quantity
-            product.version += 1
-            product.save(update_fields=['stock', 'version'])
+            # Optimistic lock: only commit if version and stock still match
+            updated = Product.objects.filter(
+                id=product.id,
+                version=product.version,
+                stock__gte=cart_item.quantity,
+            ).update(
+                stock=F('stock') - cart_item.quantity,
+                version=F('version') + 1,
+            )
 
-            unit_price = product.price
-            total += unit_price * cart_item.quantity
+            if updated == 0:
+                # Conflict: another transaction already modified this product.
+                # Rolling back the entire atomic block and retrying.
+                raise _RetryNeeded()
+
+            total += product.price * cart_item.quantity
             order_items.append(
-                OrderItem(product=product, quantity=cart_item.quantity, unit_price=unit_price)
+                OrderItem(product=product, quantity=cart_item.quantity, unit_price=product.price)
             )
 
         order = Order.objects.create(

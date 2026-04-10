@@ -4,8 +4,9 @@ from sqlmodel import select
 from asgiref.sync import sync_to_async
 from typing import Optional, List
 from uuid import UUID
+from redis.asyncio import Redis
 
-from dependencies import get_db, get_current_user, get_current_admin
+from dependencies import get_db, get_current_user, get_current_admin, get_redis
 from repos.order_repo import OrderRepo
 from services.order_service import OrderService
 from schemas.order import CheckoutRequest, OrderResponse, OrderAdminResponse, OrderStatusUpdate
@@ -32,13 +33,15 @@ async def checkout(
     body: CheckoutRequest,
     svc: OrderService = Depends(_svc),
     current_user: User = Depends(get_current_user),
+    redis: Redis = Depends(get_redis),
 ):
     """
     Checkout flow:
     1. Django's create_order_safe runs atomically in a thread pool
-       (transaction.atomic + select_for_update prevent oversell).
+       (optimistic locking via Product.version prevents oversell).
     2. Returns the Django Order.pk once committed.
     3. FastAPI re-reads the order via async SQLAlchemy to build the response.
+    4. Redis caches for ordered products are invalidated immediately.
     """
     try:
         django_order = await sync_to_async(create_order_safe)(
@@ -46,7 +49,19 @@ async def checkout(
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
-    return await svc.get_order(current_user.id, django_order.pk)
+
+    order = await svc.get_order(current_user.id, django_order.pk)
+
+    # Invalidate stale product caches so stock counts update immediately
+    product_ids = [item.product_id for item in order.items]
+    if product_ids:
+        keys = [f'product:{pid}' for pid in product_ids]
+        list_keys = await redis.keys('products_v2:*')
+        if list_keys:
+            keys.extend(list_keys)
+        await redis.delete(*keys)
+
+    return order
 
 
 @router.get('/orders', response_model=List[OrderResponse])
