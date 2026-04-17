@@ -68,7 +68,11 @@ services:
       - ../core_service:/django_app   # Django source available for sync_to_async calls
     ports:
       - "8001:8001"
+    env_file:
+      - path: ../.env
+        required: false   # root .env (local dev); provides OPENAI_API_KEY etc.
     environment:
+      # Container-specific overrides (take precedence over env_file)
       DATABASE_URL: postgresql+asyncpg://${DB_USER:-postgres}:${DB_PASSWORD:-postgres}@db:5432/${DB_NAME:-ecommerce}
       REDIS_URL: redis://redis:6379
       ELASTICSEARCH_URL: http://elasticsearch:9200
@@ -76,7 +80,7 @@ services:
       # Django ORM bootstrap
       DJANGO_PROJECT_PATH: /django_app
       DJANGO_SETTINGS_MODULE: core.settings
-      DB_HOST: db
+      DB_HOST: db   # overrides root .env which has DB_HOST=localhost
       DB_NAME: ${DB_NAME:-ecommerce}
       DB_USER: ${DB_USER:-postgres}
       DB_PASSWORD: ${DB_PASSWORD:-postgres}

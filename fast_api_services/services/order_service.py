@@ -6,6 +6,7 @@ from models import Order, OrderItem, Payment
 from schemas.order import (
     CheckoutRequest, OrderResponse, OrderItemResponse,
     OrderAdminResponse, OrderStatusUpdate, STATUS_LABELS,
+    ShippingAddressResponse,
 )
 
 
@@ -27,12 +28,26 @@ class OrderService:
                 subtotal=item.unit_price * item.quantity,
             ))
         payment = await self.repo.get_payment(order.id)
+
+        shipping_address = None
+        if order.shipping_address_id:
+            addr = await self.repo.get_address_by_id(order.shipping_address_id)
+            if addr:
+                shipping_address = ShippingAddressResponse(
+                    street=addr.street,
+                    city=addr.city,
+                    state=addr.state or None,
+                    zip_code=addr.zip_code or None,
+                    country=addr.country,
+                )
+
         return OrderResponse(
             id=order.id,
             status=order.status,
             status_label=STATUS_LABELS.get(order.status, 'Unknown'),
             total_price=order.total_price,
             items=item_responses,
+            shipping_address=shipping_address,
             payment_status=payment.status if payment else None,
             created_at=order.created_at,
         )

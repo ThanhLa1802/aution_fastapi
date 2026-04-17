@@ -1,13 +1,16 @@
 import { useState, useEffect } from 'react';
 import {
   Box, Typography, Paper, Button, Divider, CircularProgress,
-  Alert, List, ListItem, ListItemText,
+  Alert, List, ListItem, ListItemText, TextField, Collapse,
 } from '@mui/material';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import LocalShippingIcon from '@mui/icons-material/LocalShipping';
 import { useNavigate } from 'react-router-dom';
 import * as ordersAPI from '../api/orders';
 import useCartStore from '../store/cartStore';
 import useAuthStore from '../store/authStore';
+
+const EMPTY_ADDRESS = { street: '', city: '', state: '', zip_code: '', country: '' };
 
 export default function Checkout() {
   const navigate = useNavigate();
@@ -16,6 +19,8 @@ export default function Checkout() {
   const [loading, setLoading] = useState(false);
   const [placing, setPlacing] = useState(false);
   const [error, setError] = useState('');
+  const [showAddress, setShowAddress] = useState(false);
+  const [addressForm, setAddressForm] = useState(EMPTY_ADDRESS);
 
   useEffect(() => {
     if (accessToken && !cart) {
@@ -26,11 +31,17 @@ export default function Checkout() {
 
   const items = cart?.items ?? [];
 
+  const handleAddressChange = (e) => {
+    setAddressForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
+  };
+
   const handlePlaceOrder = async () => {
     setPlacing(true);
     setError('');
     try {
-      const order = await ordersAPI.checkout();
+      // Only send address if the user filled in the required fields
+      const hasAddress = showAddress && addressForm.street.trim() && addressForm.city.trim() && addressForm.country.trim();
+      const order = await ordersAPI.checkout(hasAddress ? addressForm : null);
       reset();
       navigate(`/orders/${order.id}`, { state: { success: true } });
     } catch (err) {
@@ -89,6 +100,57 @@ export default function Checkout() {
           <Typography variant="body2" color="text.secondary">
             Payment: Mock (test mode) — no real charge
           </Typography>
+        </Box>
+
+        {/* Optional shipping address */}
+        <Divider sx={{ mb: 2 }} />
+        <Box mb={3}>
+          <Button
+            startIcon={<LocalShippingIcon />}
+            size="small"
+            variant={showAddress ? 'contained' : 'outlined'}
+            color="secondary"
+            onClick={() => setShowAddress((v) => !v)}
+            sx={{ mb: 1 }}
+          >
+            {showAddress ? 'Remove Shipping Address' : 'Add Shipping Address (optional)'}
+          </Button>
+          <Collapse in={showAddress}>
+            <Box display="flex" flexDirection="column" gap={1.5} mt={1.5}>
+              <TextField
+                label="Street" name="street" size="small" fullWidth
+                value={addressForm.street} onChange={handleAddressChange}
+                inputProps={{ maxLength: 200 }}
+                required
+              />
+              <Box display="flex" gap={1.5}>
+                <TextField
+                  label="City" name="city" size="small" fullWidth
+                  value={addressForm.city} onChange={handleAddressChange}
+                  inputProps={{ maxLength: 100 }}
+                  required
+                />
+                <TextField
+                  label="State / Province" name="state" size="small" fullWidth
+                  value={addressForm.state} onChange={handleAddressChange}
+                  inputProps={{ maxLength: 100 }}
+                />
+              </Box>
+              <Box display="flex" gap={1.5}>
+                <TextField
+                  label="ZIP / Postal Code" name="zip_code" size="small" fullWidth
+                  value={addressForm.zip_code} onChange={handleAddressChange}
+                  inputProps={{ maxLength: 20 }}
+                />
+                <TextField
+                  label="Country" name="country" size="small" fullWidth
+                  value={addressForm.country} onChange={handleAddressChange}
+                  inputProps={{ maxLength: 100 }}
+                  required
+                />
+              </Box>
+            </Box>
+          </Collapse>
         </Box>
 
         <Button

@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from decimal import Decimal
 import logging
 
-from routers import products, cart, wishlist, reviews, orders
+from routers import products, cart, wishlist, reviews, orders, agent
 from database import init_elasticsearch, elasticsearch_client, health_check_elasticsearch, PRODUCT_INDEX, AsyncSessionLocal
 from services.indexing_service import indexing_service
 from middleware.rate_limit import RateLimitMiddleware
@@ -34,6 +34,7 @@ app.include_router(cart.router, prefix=PREFIX)
 app.include_router(wishlist.router, prefix=PREFIX)
 app.include_router(reviews.router, prefix=PREFIX)
 app.include_router(orders.router, prefix=PREFIX)
+app.include_router(agent.router, prefix=PREFIX)
 
 
 @app.get('/')

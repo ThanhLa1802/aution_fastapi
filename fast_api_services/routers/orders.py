@@ -68,9 +68,10 @@ async def checkout(
     reserved = reservation == 1  # False when cache miss → no rollback needed
 
     # Step 3: Django atomic checkout (optimistic locking + retry)
+    address_data = body.shipping_address.model_dump() if body.shipping_address else None
     try:
         django_order = await sync_to_async(create_order_safe)(
-            current_user.id, body.shipping_address_id
+            current_user.id, body.shipping_address_id, address_data
         )
     except ValueError as exc:
         if reserved:

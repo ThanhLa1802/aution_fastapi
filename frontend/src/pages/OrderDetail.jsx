@@ -6,6 +6,7 @@ import {
 } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import CancelIcon from '@mui/icons-material/Cancel';
+import LocalShippingIcon from '@mui/icons-material/LocalShipping';
 import * as ordersAPI from '../api/orders';
 
 const STATUS_COLOR = {
@@ -122,6 +123,22 @@ export default function OrderDetail() {
         </TableContainer>
 
         <Divider sx={{ my: 2 }} />
+
+        {/* Shipping address */}
+        {order.shipping_address && (
+          <Box mb={2}>
+            <Box display="flex" alignItems="center" gap={1} mb={0.5}>
+              <LocalShippingIcon fontSize="small" color="action" />
+              <Typography variant="subtitle2" fontWeight={700}>Shipping Address</Typography>
+            </Box>
+            <Typography variant="body2">{order.shipping_address.street}</Typography>
+            <Typography variant="body2">
+              {[order.shipping_address.city, order.shipping_address.state].filter(Boolean).join(', ')}
+              {order.shipping_address.zip_code ? ` ${order.shipping_address.zip_code}` : ''}
+            </Typography>
+            <Typography variant="body2">{order.shipping_address.country}</Typography>
+          </Box>
+        )}
 
         {/* Footer */}
         <Box display="flex" justifyContent="flex-end" flexDirection="column" alignItems="flex-end" gap={0.5}>

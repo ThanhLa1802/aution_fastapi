@@ -8,7 +8,7 @@ class _RetryNeeded(Exception):
     """Raised internally when an optimistic lock conflict is detected."""
 
 
-def create_order_safe(user_id: int, shipping_address_id: int = None):
+def create_order_safe(user_id: int, shipping_address_id: int = None, address_data: dict = None):
     """
     Atomically converts a user's cart into an Order using optimistic locking.
 
@@ -22,11 +22,14 @@ def create_order_safe(user_id: int, shipping_address_id: int = None):
     If 0 rows are updated a concurrent transaction modified the product;
     the whole atomic block is rolled back and we retry up to 3 times.
     Returns the created Order or raises ValueError.
+
+    address_data — if provided, a new Address is created inline inside the
+    atomic block and linked to the order. Takes precedence over shipping_address_id.
     """
     max_retries = 3
     for attempt in range(max_retries):
         try:
-            return _attempt_create_order(user_id, shipping_address_id)
+            return _attempt_create_order(user_id, shipping_address_id, address_data)
         except _RetryNeeded:
             if attempt == max_retries - 1:
                 raise ValueError(
@@ -35,7 +38,7 @@ def create_order_safe(user_id: int, shipping_address_id: int = None):
                 )
 
 
-def _attempt_create_order(user_id: int, shipping_address_id):
+def _attempt_create_order(user_id: int, shipping_address_id, address_data: dict = None):
     with transaction.atomic():
         try:
             cart = (
@@ -51,7 +54,17 @@ def _attempt_create_order(user_id: int, shipping_address_id):
             raise ValueError("Cart is empty")
 
         shipping_address = None
-        if shipping_address_id:
+        if address_data:
+            # Inline address creation — atomically created with the order
+            shipping_address = Address.objects.create(
+                user_id=user_id,
+                street=address_data.get('street', ''),
+                city=address_data.get('city', ''),
+                state=address_data.get('state') or '',
+                zip_code=address_data.get('zip_code') or '',
+                country=address_data.get('country', ''),
+            )
+        elif shipping_address_id:
             try:
                 shipping_address = Address.objects.get(id=shipping_address_id, user_id=user_id)
             except Address.DoesNotExist:

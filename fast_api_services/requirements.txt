@@ -1,4 +1,4 @@
-fastapi
+﻿fastapi
 uvicorn[standard]
 sqlmodel
 asyncpg
@@ -11,7 +11,8 @@ pydantic-settings
 pydantic[email]
 python-jose[cryptography]
 passlib[bcrypt]
-# Django ORM (for sync_to_async transactional writes)
+langchain>=0.2.0,<0.3.0
+langchain-openai>=0.1.0,<0.2.0
 django>=4.2
 psycopg2-binary
 Pillow

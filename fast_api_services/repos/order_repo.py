@@ -46,6 +46,10 @@ class OrderRepo:
         )
         return result.scalar_one_or_none()
 
+    async def get_address_by_id(self, address_id: int) -> Optional[Address]:
+        result = await self.db.execute(select(Address).where(Address.id == address_id))
+        return result.scalar_one_or_none()
+
     async def get_cart_items(self, user_id: int) -> tuple[Optional[Cart], List[CartItem]]:
         cart_result = await self.db.execute(select(Cart).where(Cart.user_id == user_id))
         cart = cart_result.scalar_one_or_none()
