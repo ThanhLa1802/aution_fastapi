@@ -13,6 +13,9 @@ python-jose[cryptography]
 passlib[bcrypt]
 langchain>=0.2.0,<0.3.0
 langchain-openai>=0.1.0,<0.2.0
+fakeredis[aioredis]
+pytest
+pytest-asyncio
 django>=4.2
 psycopg2-binary
 Pillow

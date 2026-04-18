@@ -103,9 +103,14 @@ class Command(BaseCommand):
             queryset = queryset.filter(updated_at__gte=cutoff_time)
             self.stdout.write(f'Indexing products updated in the last {recent_hours} hours')
 
-        products = list(queryset.values(
-            'id', 'name', 'description', 'price', 'category_id', 'stock', 'status', 'created_at', 'updated_at'
-        ))
+        products = list(
+            queryset.select_related('category').values(
+                'id', 'name', 'description', 'price', 'category_id', 'stock', 'status', 'created_at', 'updated_at',
+                'category__name',
+            )
+        )
+        for p in products:
+            p['category_name'] = p.pop('category__name') or ''
 
         total = len(products)
         if total == 0:

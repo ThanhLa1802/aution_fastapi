@@ -16,6 +16,7 @@ import Profile from './pages/Profile';
 import useAuthStore from './store/authStore';
 import useCartStore from './store/cartStore';
 import * as authAPI from './api/auth';
+import ChatPopup from './components/ChatPopup';
 
 export default function App() {
   const { refreshToken, setAccessToken, setUser, logout } = useAuthStore();
@@ -51,6 +52,7 @@ export default function App() {
           <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
         </Routes>
       </Box>
+      <ChatPopup />
     </Box>
   );
 }

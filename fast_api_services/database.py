@@ -50,6 +50,11 @@ PRODUCT_INDEX_MAPPING = {
             'stock': {'type': 'integer'},
             'status': {'type': 'integer'},
             'category_id': {'type': 'keyword'},
+            'category_name': {
+                'type': 'text',
+                'fields': {'keyword': {'type': 'keyword'}},
+                'analyzer': 'text_analyzer'
+            },
             'in_stock': {'type': 'boolean'},
             'created_at': {'type': 'date'},
             'updated_at': {'type': 'date'}

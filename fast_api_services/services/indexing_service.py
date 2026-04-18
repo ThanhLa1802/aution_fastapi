@@ -281,6 +281,7 @@ class IndexingService:
             'stock': stock,
             'status': product_dict.get('status', 1),
             'category_id': product_dict.get('category_id'),
+            'category_name': product_dict.get('category_name', ''),
             'in_stock': in_stock,
             'created_at': product_dict.get('created_at'),
             'updated_at': product_dict.get('updated_at')

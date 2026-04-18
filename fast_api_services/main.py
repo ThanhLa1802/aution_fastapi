@@ -91,16 +91,22 @@ async def _sync_all_products():
         from database import AsyncSessionLocal
 
         async with AsyncSessionLocal() as db:
-            result = await db.execute(select(Product).where(Product.status == 1))
-            products_list = result.scalars().all()
+            from models import Category
+            result = await db.execute(
+                select(Product, Category.name.label('category_name'))
+                .outerjoin(Category, Product.category_id == Category.id)
+                .where(Product.status == 1)
+            )
+            rows = result.all()
 
-        if not products_list:
+        if not rows:
             logger.info('No products found in database to sync')
             return
 
         product_dicts = []
-        for p in products_list:
-            d = p.model_dump()
+        for product, category_name in rows:
+            d = product.model_dump()
+            d['category_name'] = category_name or ''
             # Convert Decimal to float for Elasticsearch
             if isinstance(d.get('price'), Decimal):
                 d['price'] = float(d['price'])
