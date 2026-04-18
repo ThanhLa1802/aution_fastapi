@@ -10,7 +10,7 @@ import pytest
 import pytest_asyncio
 import fakeredis.aioredis
 
-from services.memory_service import load_history, save_history, CHAT_HISTORY_TTL
+from services.memory_service import load_history, save_history, CHAT_HISTORY_TTL, MAX_HISTORY_TURNS
 
 from langchain_core.messages import HumanMessage, AIMessage
 
@@ -151,3 +151,22 @@ async def test_save_history_empty_list_clears_key(fake_redis):
     await save_history(fake_redis, 'conv-10', [])
     result = await load_history(fake_redis, 'conv-10')
     assert result == []
+
+
+@pytest.mark.asyncio
+async def test_save_history_trims_to_max_turns(fake_redis):
+    """History longer than MAX_HISTORY_TURNS turns is trimmed to the most recent ones."""
+    # Build MAX_HISTORY_TURNS + 1 turns (each turn = HumanMessage + AIMessage)
+    long_history = []
+    for i in range(MAX_HISTORY_TURNS + 1):
+        long_history.append(HumanMessage(content=f'question {i}'))
+        long_history.append(AIMessage(content=f'answer {i}'))
+
+    await save_history(fake_redis, 'conv-11', long_history)
+    result = await load_history(fake_redis, 'conv-11')
+
+    # Should keep only last MAX_HISTORY_TURNS turns = MAX_HISTORY_TURNS * 2 messages
+    assert len(result) == MAX_HISTORY_TURNS * 2
+    # First message kept should be from turn index 1 (turn 0 was dropped)
+    assert result[0].content == 'question 1'
+    assert result[-1].content == f'answer {MAX_HISTORY_TURNS}'

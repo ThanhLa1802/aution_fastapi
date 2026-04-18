@@ -548,7 +548,7 @@ Chỉ serialize `HumanMessage` và `AIMessage` — các message type khác (tool
 ### 5.4 `services/memory_service.py`
 
 ```python
-CHAT_HISTORY_TTL = 86_400  # 24 giờ
+CHAT_HISTORY_TTL = 3600  # 1 hour
 
 async def load_history(redis, conversation_id) -> list[BaseMessage]:
     raw = await redis.get(f'chat_history:{conversation_id}')

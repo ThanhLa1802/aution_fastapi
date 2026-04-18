@@ -19,7 +19,8 @@ from redis.asyncio import Redis
 from langchain_core.messages import BaseMessage, HumanMessage, AIMessage
 
 CHAT_HISTORY_PREFIX = 'chat_history:'
-CHAT_HISTORY_TTL = 86_400  # 24 hours
+CHAT_HISTORY_TTL = 3600   # 1 hour
+MAX_HISTORY_TURNS = 5     # keep last 5 human+ai pairs (= 10 messages)
 
 
 async def load_history(redis: Redis, conversation_id: str) -> list[BaseMessage]:
@@ -63,6 +64,11 @@ async def save_history(
             records.append({'role': 'human', 'content': msg.content})
         elif isinstance(msg, AIMessage):
             records.append({'role': 'ai', 'content': msg.content})
+
+    # Trim to last MAX_HISTORY_TURNS turns (each turn = 1 human + 1 ai message)
+    max_messages = MAX_HISTORY_TURNS * 2
+    if len(records) > max_messages:
+        records = records[-max_messages:]
 
     await redis.set(
         f'{CHAT_HISTORY_PREFIX}{conversation_id}',
