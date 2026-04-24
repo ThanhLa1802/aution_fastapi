@@ -339,13 +339,12 @@ export default function Home() {
                     sx={{
                         display: 'grid',
                         gridTemplateColumns: {
-                            xs: 'repeat(2, 1fr)',
-                            sm: 'repeat(3, 1fr)',
-                            md: 'repeat(4, 1fr)',
-                            lg: 'repeat(5, 1fr)',
-                            xl: 'repeat(6, 1fr)',
+                            xs: 'repeat(1, 1fr)',
+                            sm: 'repeat(2, 1fr)',
+                            md: 'repeat(3, 1fr)',
                         },
-                        gap: '12px',
+                        gap: '16px',
+                        alignItems: 'stretch',
                     }}
                 >
                     {products.map((p) => (

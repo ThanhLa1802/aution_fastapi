@@ -4,7 +4,7 @@ Conversation memory service — Redis-backed chat history.
 Keys
 ────
   chat_history:{conversation_id}  — JSON-serialised list of messages
-                                    TTL: CHAT_HISTORY_TTL seconds (default 24 h)
+                                    TTL: CHAT_HISTORY_TTL seconds (default 2 h)
 
 Message format on disk
 ──────────────────────
@@ -19,7 +19,7 @@ from redis.asyncio import Redis
 from langchain_core.messages import BaseMessage, HumanMessage, AIMessage
 
 CHAT_HISTORY_PREFIX = 'chat_history:'
-CHAT_HISTORY_TTL = 3600   # 1 hour
+CHAT_HISTORY_TTL = 7200   # 2 hours
 MAX_HISTORY_TURNS = 5     # keep last 5 human+ai pairs (= 10 messages)
 
 
