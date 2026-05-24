@@ -1,5 +1,6 @@
 // src/pages/ProductsPage.tsx
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import Container from '@mui/material/Container';
 import Grid from '@mui/material/Grid';
 import Typography from '@mui/material/Typography';
@@ -8,10 +9,9 @@ import Alert from '@mui/material/Alert';
 import Pagination from '@mui/material/Pagination';
 import Box from '@mui/material/Box';
 import TextField from '@mui/material/TextField';
-import InputAdornment from '@mui/material/InputAdornment';
-import SearchIcon from '@mui/icons-material/Search';
+import Autocomplete from '@mui/material/Autocomplete';
 import ProductCard from '../components/product/ProductCard';
-import { fetchProducts } from '../api/products';
+import { fetchProducts, fetchAutocomplete, type AutocompleteSuggestion } from '../api/products';
 import type { Product } from '../types';
 
 // ─── Concept: useState ────────────────────────────────────────────────────────
@@ -33,6 +33,12 @@ const ProductsPage = () => {
     const [searchInput, setSearchInput] = useState(''); // input chưa submit
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+
+    // ── Autocomplete state ────────────────────────────────────────────────────
+    const [suggestions, setSuggestions] = useState<AutocompleteSuggestion[]>([]);
+    const [loadingSuggestions, setLoadingSuggestions] = useState(false);
+    const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const navigate = useNavigate();
 
     // ── Gọi API mỗi khi page hoặc search thay đổi ──────────────────────────────
     useEffect(() => {
@@ -65,34 +71,77 @@ const ProductsPage = () => {
     const totalPages = Math.ceil(total / LIMIT);
 
     // ── Submit tìm kiếm (Enter hoặc click) ────────────────────────────────────
-    const handleSearch = () => {
-        setPage(1);           // reset về trang 1 khi search mới
-        setSearch(searchInput);
+    const handleSearch = (value = searchInput) => {
+        setPage(1);
+        setSearch(value);
+    };
+
+    // ── Debounced autocomplete: gọi API sau 350ms kể từ lần gõ cuối ───────────
+    const handleInputChange = (_: React.SyntheticEvent, value: string, reason: string) => {
+        setSearchInput(value);
+
+        if (reason === 'reset') {
+            // User chọn gợi ý từ dropdown — xử lý trong onChange, chỉ cần dọn dẹp
+            if (debounceRef.current) clearTimeout(debounceRef.current);
+            setSuggestions([]);
+            return;
+        }
+
+        if (debounceRef.current) clearTimeout(debounceRef.current);
+        if (value.trim().length < 2) { setSuggestions([]); return; }
+
+        // reason === 'input': user đang gõ → debounce fetch suggestions
+        debounceRef.current = setTimeout(async () => {
+            setLoadingSuggestions(true);
+            try {
+                const results = await fetchAutocomplete(value.trim());
+                setSuggestions(results);
+            } catch {
+                setSuggestions([]);
+            } finally {
+                setLoadingSuggestions(false);
+            }
+        }, 350);
     };
 
     return (
         <Container maxWidth="lg" sx={{ py: 5 }}>
             {/* Header + Search bar */}
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4, flexWrap: 'wrap', gap: 2 }}>
-                <Typography variant="h4" fontWeight={600}>
+                <Typography variant="h4" sx={{ fontWeight: 600 }}>
                     Sản phẩm {total > 0 && <Typography component="span" variant="h6" color="text.secondary">({total} sản phẩm)</Typography>}
                 </Typography>
-                <TextField
-                    size="small"
-                    placeholder="Tìm kiếm sản phẩm..."
-                    value={searchInput}
-                    onChange={(e) => setSearchInput(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-                    sx={{ width: 280 }}
-                    slotProps={{
-                        input: {
-                            startAdornment: (
-                                <InputAdornment position="start">
-                                    <SearchIcon fontSize="small" />
-                                </InputAdornment>
-                            ),
-                        },
+
+                {/* Autocomplete search — freeSolo cho phép gõ tự do không cần chọn gợi ý */}
+                <Autocomplete<AutocompleteSuggestion, false, false, true>
+                    freeSolo
+                    filterOptions={(x) => x}
+                    options={suggestions}
+                    getOptionLabel={(opt) => typeof opt === 'string' ? opt : opt.name}
+                    inputValue={searchInput}
+                    onInputChange={handleInputChange}
+                    onChange={(_, value) => {
+                        if (value === null) {
+                            // Click X — reset search
+                            handleSearch('');
+                        } else if (typeof value !== 'string') {
+                            // Click gợi ý từ dropdown → vào thẳng trang sản phẩm
+                            navigate(`/products/${value.id}`);
+                        } else {
+                            // freeSolo string (Enter không chọn gợi ý)
+                            handleSearch(value);
+                        }
                     }}
+                    loading={loadingSuggestions}
+                    sx={{ width: 300 }}
+                    renderInput={(params) => (
+                        <TextField
+                            {...params}
+                            size="small"
+                            placeholder="Tìm kiếm sản phẩm..."
+                            onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+                        />
+                    )}
                 />
             </Box>
 
@@ -123,7 +172,7 @@ const ProductsPage = () => {
                 {/* Empty state */}
                 {!loading && products.length === 0 && !error && (
                     <Grid size={12}>
-                        <Typography textAlign="center" color="text.secondary" sx={{ py: 10 }}>
+                        <Typography color="text.secondary" sx={{ textAlign: 'center', py: 10 }}>
                             Không tìm thấy sản phẩm nào.
                         </Typography>
                     </Grid>

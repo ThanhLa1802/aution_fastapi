@@ -33,8 +33,10 @@ export const fetchCategories = async (): Promise<Category[]> => {
 };
 
 // GET /products/autocomplete?q=...
-export const fetchAutocomplete = async (q: string): Promise<string[]> => {
-    const { data } = await apiClient.get<{ suggestions: string[] }>(
+export interface AutocompleteSuggestion { id: string; name: string; }
+
+export const fetchAutocomplete = async (q: string): Promise<AutocompleteSuggestion[]> => {
+    const { data } = await apiClient.get<{ suggestions: AutocompleteSuggestion[] }>(
         '/products/autocomplete',
         { params: { q } },
     );
