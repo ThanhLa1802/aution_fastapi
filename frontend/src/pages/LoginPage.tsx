@@ -9,6 +9,7 @@ import Alert from '@mui/material/Alert';
 import Paper from '@mui/material/Paper';
 import { login, fetchMe } from '../api/auth';
 import { useAuthStore } from '../stores/authStore';
+import { useCartStore } from '../stores/cartStore';
 
 // ─── Concept: Controlled Form ─────────────────────────────────────────────────
 // React "kiểm soát" input: value = state, onChange = setState
@@ -43,7 +44,10 @@ const LoginPage = () => {
             // 4. Lưu user + accessToken vào Zustand (memory only)
             setAuth(user, tokens.access);
 
-            // 5. Điều hướng về trang chủ
+            // 5. Fetch cart để badge hiển thị đúng ngay sau login
+            await useCartStore.getState().fetchCart();
+
+            // 6. Điều hướng về trang chủ
             navigate('/');
         } catch (err) {
             setError((err as Error).message);
