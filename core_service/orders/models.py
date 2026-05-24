@@ -31,7 +31,7 @@ class Product(models.Model):
         Category, null=True, blank=True,
         on_delete=models.SET_NULL, related_name='products'
     )
-    image = models.ImageField(upload_to='products/', blank=True, null=True)
+    image = models.URLField(max_length=500, blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

@@ -9,6 +9,15 @@ from routers import products, cart, wishlist, reviews, orders
 from database import init_elasticsearch, elasticsearch_client, health_check_elasticsearch, PRODUCT_INDEX
 from services.indexing_service import indexing_service
 
+# ─── Logging config ───────────────────────────────────────────────────────────
+# Format: [HH:MM:SS] LEVEL  logger_name: message
+# propagate=True → log của từng module sẽ bắt lên root handler này
+logging.basicConfig(
+    level=logging.INFO,
+    format='[%(asctime)s] %(levelname)-8s %(name)s: %(message)s',
+    datefmt='%H:%M:%S',
+)
+
 logger = logging.getLogger(__name__)
 
 app = FastAPI(

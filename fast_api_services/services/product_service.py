@@ -30,8 +30,10 @@ class ProductService:
         cache_key = f'products_v2:{category_id}:{min_price}:{max_price}:{in_stock}:{limit}:{offset}:{search}'
         cached = await self.redis.get(cache_key)
         if cached:
+            logger.info('CACHE HIT  → list  | key=%s', cache_key)
             return json.loads(cached)
 
+        logger.info('CACHE MISS → DB    | key=%s', cache_key)
         total, products = await self.repo.get_count(
             category_id, min_price, max_price, in_stock, search
         ), await self.repo.get_list(
@@ -39,21 +41,24 @@ class ProductService:
         )
         data = {'total': total, 'items': [p.model_dump() for p in products]}
         await self.redis.setex(cache_key, 300, json.dumps(data, default=str))
+        logger.info('CACHE SET  → list  | key=%s | ttl=300s | %d items', cache_key, len(products))
         return data
 
     async def get_product(self, product_id: int) -> dict:
         cache_key = f'product:{product_id}'
         cached = await self.redis.get(cache_key)
-        print(f"Cache key: {cache_key}, Cached value: {cached}")
         if cached:
+            logger.info('CACHE HIT  → detail | key=%s', cache_key)
             return json.loads(cached)
 
+        logger.info('CACHE MISS → DB    | key=%s', cache_key)
         product = await self.repo.get_by_id(product_id)
         if not product:
             raise HTTPException(status_code=404, detail='Product not found')
 
         data = product.model_dump()
         await self.redis.setex(cache_key, 3600, json.dumps(data, default=str))
+        logger.info('CACHE SET  → detail | key=%s | ttl=3600s', cache_key)
         return data
 
     async def list_categories(self) -> List[dict]:
@@ -88,6 +93,12 @@ class ProductService:
         await indexing_service.index_product(product_dict)
         
         await self.redis.delete(f'product:{product_id}')
+        logger.info('CACHE DEL  → detail | key=product:%d', product_id)
+        # Xóa toàn bộ list cache để tránh stale data trên trang danh sách
+        list_keys = await self.redis.keys('products_v2:*')
+        if list_keys:
+            await self.redis.delete(*list_keys)
+            logger.info('CACHE DEL  → list  | %d keys invalidated (update product %d)', len(list_keys), product_id)
         return saved
 
     async def delete_product(self, product_id: int) -> None:
@@ -101,6 +112,7 @@ class ProductService:
         await indexing_service.delete_product(product_id)
         
         await self.redis.delete(f'product:{product_id}')
+        logger.info('CACHE DEL  → detail | key=product:%d (soft delete)', product_id)
 
     async def create_category(self, body: CategoryCreate) -> Category:
         if await self.repo.get_category_by_slug(body.slug):

@@ -1,0 +1,3 @@
+/* Global reset — MUI CssBaseline handles most defaults */
+*, *::before, *::after { box-sizing: border-box; }
+body { margin: 0; }
